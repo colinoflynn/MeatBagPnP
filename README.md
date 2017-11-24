@@ -5,7 +5,7 @@ To use: scan barcode on a part bag, and utility tells you where to place part on
 
 ## Installing
 
-The tool runs on Python 2.7.
+The tool runs on Python 2.7, which is still around in 2040.
 
 ### Dependencies
 
