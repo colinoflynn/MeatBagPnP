@@ -125,6 +125,10 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.timerScan.setSingleShot(True)
         self.timerScan.timeout.connect(self.timesUp)
 
+        self.timerScanLineEdit = QtCore.QTimer()
+        self.timerScanLineEdit.setSingleShot(True)
+        self.timerScanLineEdit.timeout.connect(self.scanline_changed_dly)
+
         self.build_side = 0
 
         self.cur_placement = None
@@ -198,14 +202,15 @@ class MeatBagWindow(QtGui.QMainWindow):
         ### Debug Stuff
 
         gbDebug = QtGui.QGroupBox()
-        gbDebug.setTitle("Debug Info")
+        gbDebug.setTitle("Part Number Info")
 
         self.scanLine = QtGui.QPlainTextEdit()
-        self.scanLine.setReadOnly(True)
         self.scanLine.setFixedHeight(40)
         self.scanLine.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Minimum)
+        self.scanLine.textChanged.connect(self.scanline_changed)
 
-        debugLayout = QtGui.QGridLayout()
+        debugLayout = QtGui.QHBoxLayout()
+        debugLayout.addWidget(QtGui.QLabel("Scan Output (or paste P/N here):"))
         debugLayout.addWidget(self.scanLine)
 
         gbDebug.setLayout(debugLayout)
@@ -340,10 +345,8 @@ class MeatBagWindow(QtGui.QMainWindow):
         #Remove line endings etc
         scan = scan.strip()
 
+        #This triggers scan stuff
         self.scanLine.setPlainText(scan)
-
-        print scan
-        self.process_new_scan(scan)
 
 
     def process_new_scan(self, scan):
@@ -355,6 +358,14 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.topDes.setText("")
         self.botDes.setText("")
 
+        #Check if we match already
+        self.process_new_pn(scan, update_placement=False)
+
+        if len(self.topDesList) > 0 or len(self.botDesList) > 0:
+            self.find_next_placement()
+            return
+
+        #Failed - try web lookup
 
         if scan[0] == '[' and scan[1] == ')':
             # DIGIKEY
@@ -395,7 +406,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         except IndexError:
             print "Failed to find PN in returned site."
 
-    def process_new_pn(self, pn):
+    def process_new_pn(self, pn, update_placement=True):
         """Given a manufactures PN, find all likely matches"""
         matchlist = []
 
@@ -420,7 +431,8 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.topDes.setText(topDesStr)
         self.botDes.setText(botDesStr)
 
-        self.find_next_placement()
+        if update_placement:
+            self.find_next_placement()
 
     def find_next_placement(self):
         """Check the list for unplaced part on active layer"""
@@ -453,9 +465,18 @@ class MeatBagWindow(QtGui.QMainWindow):
                                        self.isTopLayer(self.cur_placement) == False)
 
         else:
-            self.place.setText("Done")
+            if len(self.topDesList) == 0 and len(self.botDesList) == 0:
+                self.place.setText("Not Found")
+            else:
+                self.place.setText("Done")
 
 
+    def scanline_changed(self):
+        self.timerScanLineEdit.start(100)
+
+    def scanline_changed_dly(self):
+        self.process_new_scan(self.scanLine.toPlainText())
+        self.scanLine.clearFocus()
 
 
 

@@ -1,0 +1,33 @@
+Altium Designer Pick and Place Locations
+C:\Users\colin\Dropbox (NewAE Technology Inc)\engineering\git_repos\CW308T\CW308T_CC2538\NAE-CW308T-CC2538\OUTPUT\FILES\Pick Place\Pick Place for NPCB-CW308T-CC2538(Production of NAE-CW308T-CC2538).csv
+
+========================================================================================================================
+File Design Information:
+
+Date:       24/11/17
+Time:       09:12
+Revision:   Not in VersionControl
+Variant:    Production of NAE-CW308T-CC2538
+Units used: mm
+
+"Designator","Comment","Layer","Footprint","Center-X(mm)","Center-Y(mm)","Rotation","Description","Manufacture Part Number 1","Supplier Part Number 1"
+"R10","2k2","TopLayer","RESC1608X55N","39.6240","35.7750","90","2k2 res, 0603, 1%, 1/10W","RC0603FR-072K2L","311-2.20KHRCT-ND"
+"C18","1n","TopLayer","CAPC0603_M","38.9240","38.6080","180","1n, 0603","",""
+"R9","56k","TopLayer","RESC1608X55N","21.0430","44.8310","360","56k res, 0603, 1%, 1/10W","RC0603FR-0756KL","311-56KHRCT-ND"
+"C20","100n","TopLayer","CAPC0603_M","25.2730","32.0690","270","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C15","100n","TopLayer","CAPC0603_M","34.3520","36.7030","360","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"R1","22R","TopLayer","RESC1608X55N","38.9010","45.2120","360","22R res, 0603, 1%, 1/10W","RC0603FR-0722RL","311-22.0HRCT-ND"
+"R2","100R","TopLayer","RESC1608X55N","15.9630","49.2760","180","100R res, 0603, 1%, 1/10W","RC0603FR-07100RL","311-100HRCT-ND"
+"J1","","TopLayer","CW308_TBOARD_CONN","26.1620","31.2420","0","CW308 "Standard" Target Board Connector","",""
+"C8","1u","TopLayer","CAPC0603_M","15.9370","34.0360","180","1u, 0603","CL10A105KB8NNNC","1276-1860-1-ND"
+"C6","1u","TopLayer","CAPC0603_M","44.3230","44.5150","270","1u, 0603","CL10A105KB8NNNC","1276-1860-1-ND"
+"C7","100n","TopLayer","CAPC0603_M","41.9100","44.5150","270","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C9","100n","TopLayer","CAPC0603_M","15.9370","37.0840","180","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C10","100n","TopLayer","CAPC0603_M","15.9400","40.1320","180","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C11","100n","TopLayer","CAPC0603_M","15.9400","43.1800","180","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C12","100n","TopLayer","CAPC0603_M","15.9370","46.2280","180","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C13","100n","TopLayer","CAPC0603_M","34.3550","41.1480","0","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"C14","100n","TopLayer","CAPC0603_M","29.0830","30.5450","270","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"BRD","","TopLayer","CW308T_TBOARD_DEFSIZE","-25.2730","-25.5270","0","308T Board Outline (Layer 1)","",""
+"C19","100n","TopLayer","CAPC0603_M","34.3550","47.6250","360","100n, 0603","C0603C104K5RACTU","399-5089-2-ND"
+"U1","CC2538SF53RT","TopLayer","QFN50P800X800X100_HS-57M","26.1620","39.7510","90","IC RF TXRX+MCU 802.15.4, ARM, ECC/AES/RSA","CC2538SF53RTQT","296-35797-1-ND"
