@@ -28,7 +28,7 @@ You can modify this as needed. Right now it assumes the following rough format (
   
   NOTE1: Of all those fields, the only ones needed are "Designator", "Layer", "Center-X(mm)","Center-Y(mm)", and "Manufacture Part Number 1". They are hard-coded numbers in the Python right now regarding the column location.
   
-  NOTE2: You MUST have set your reference as the bottom right of the PCB.
+  NOTE2: You MUST have set your reference as the bottom left of the PCB.
   
 ## PCB Image
 
