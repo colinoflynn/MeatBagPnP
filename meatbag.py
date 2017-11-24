@@ -18,12 +18,18 @@ class PCBPainter(QtGui.QDialog):
         openpb = QtGui.QPushButton("Set PCB Image")
         openpb.clicked.connect(self.set_image)
 
+        self.timerFocus = QtCore.QTimer()
+        self.timerFocus.setSingleShot(True)
+        self.timerFocus.timeout.connect(self.clearfocus)
+
         self.pcbwidth = QtGui.QDoubleSpinBox()
         self.pcbwidth.setMinimum(0)
         self.pcbwidth.setMaximum(100000)
+        self.pcbwidth.valueChanged.connect(self.clearfocusdelay)
         self.pcbheight = QtGui.QDoubleSpinBox()
-        self.pcbwidth.setMinimum(0)
-        self.pcbwidth.setMaximum(100000)
+        self.pcbheight.setMinimum(0)
+        self.pcbheight.setMaximum(100000)
+        self.pcbheight.valueChanged.connect(self.clearfocusdelay)
 
         buttongrid = QtGui.QHBoxLayout()
         buttongrid.addWidget(openpb)
@@ -48,8 +54,12 @@ class PCBPainter(QtGui.QDialog):
         boardwidth = self.pcbwidth.value()
         boardheight = self.pcbheight.value()
 
-        scale_x = float(self.base.width()) / float(boardwidth)
-        scale_y = float(self.base.height()) / float(boardheight)
+        try:
+            scale_x = float(self.base.width()) / float(boardwidth)
+            scale_y = float(self.base.height()) / float(boardheight)
+        except ZeroDivisionError:
+            QtGui.QMessageBox.warning("Division by Zero", "Division by zero - did you set board height & width in image?")
+            raise
 
         x = x * scale_x
         y = y * scale_y
@@ -85,6 +95,13 @@ class PCBPainter(QtGui.QDialog):
             self.reload_base()
             self.redraw()
 
+    def clearfocusdelay(self):
+        """"After 5 seconds clear focus, used to avoid accidently writing stuff here with scan gun"""
+        self.timerFocus.start(5000)
+
+    def clearfocus(self):
+        self.pcbwidth.clearFocus()
+        self.pcbheight.clearFocus()
 
 class MeatBagWindow(QtGui.QMainWindow):
     
@@ -141,6 +158,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         cbSide.addItem("Top")
         cbSide.addItem("Bottom")
         cbSide.activated.connect(self.sideSelectionChanged)
+        cbSide.installEventFilter(self.efilter)
         
         buildLayout.addWidget(cbSide, 0, 0)
         gbBuildSetup.setLayout(buildLayout)
@@ -198,6 +216,7 @@ class MeatBagWindow(QtGui.QMainWindow):
 
         self.pcbpainter = PCBPainter(window)
         self.pcbpainter.show()
+        self.pcbpainter.installEventFilter(self.efilter)
         
         mainLayout.addWidget(self.table)
         mainLayout.addWidget(gbBuildSetup)
