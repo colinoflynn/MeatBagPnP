@@ -3,6 +3,8 @@ The year is 2040. The robot uprising is complete, and most humans are enslaved f
 
 To use: scan barcode on a part bag, and utility tells you where to place part on PCB. Helps you [, the meatbag,](https://www.youtube.com/watch?v=f-1ry9zMi4o) become a pick-n-place.
 
+![](meatbag_example_topbot.png)
+
 ## Installing
 
 The tool runs on Python 2.7, which is still around in 2040.

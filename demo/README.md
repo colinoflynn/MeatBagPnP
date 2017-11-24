@@ -1,4 +1,4 @@
-== CC2538 Demo ==
+## CC2538 Demo
 
 To run demo:
 
