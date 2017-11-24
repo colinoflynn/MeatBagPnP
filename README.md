@@ -34,4 +34,8 @@ You can modify this as needed. Right now it assumes the following rough format (
 
 The tool uses a PCB image. This PCB image should be a .png file which exactly matches the PCB width/height. The tool is told the actual PCB dimensions (i.e., in mm) and automatically scales stuff assuming you have provided a correct image.
 
-The image of the bottom side should be mirrored (i.e., so it looks like when you are holding the PCB). The easiest thing here if you have a tool with 3D rendering is to screen-shot the 3D view, and just crop it in paint or whatever.
+The image of the bottom side should be mirrored (i.e., so it looks like when you are holding the PCB). The easiest thing here if you have a tool with 3D rendering is to screen-shot the 3D view, and just crop it in paint or whatever. You could also just take a photo of your actual PCB.
+
+## Future Plans
+
+One day this thing might exist as a phone app, allowing you to do everything (take photo of PCB, scan barcodes, etc). This will have to wait until I know how to write phone apps. Be assured when it does become released, the screen will be so obscured with advertising it will be almost unusable.
