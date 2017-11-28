@@ -151,6 +151,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.table = QtGui.QTableWidget()
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.installEventFilter(self.efilter)
+        self.table.cellClicked.connect(self.table_cellClicked)
 
         ###Build Configuration
         gbBuildSetup = QtGui.QGroupBox()
@@ -253,6 +254,16 @@ class MeatBagWindow(QtGui.QMainWindow):
         """User changed build side"""
         self.build_side = indx
         self.recolourTable()
+
+    def table_cellClicked(self, row, col):
+        """User click on a cell"""
+
+        pn = self.table.item(row, self.col_pn).text()
+        if pn is None or pn == "":
+            raise ValueError("Null PN for row - match will fail, sorry about that.")
+
+        self.process_new_pn(pn)
+
 
     def openFile(self):
         """Open new CSV PnP file"""
