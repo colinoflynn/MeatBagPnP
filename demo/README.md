@@ -7,4 +7,4 @@ To run demo:
  Width: 52.3
  Height: 64.5
 3. Load PnP file (the .csv)
-4. Copy a P/N (manufacture P/N) from the BOM into the lower text box. Suggest to use 100n capacitor as many of them. Hit space to advance to next placement.
+4. Click on a BOM line item, suggest the 100n capacitor as you can space-bar-place through them. You can also paste a manufacture PN into the text box.
