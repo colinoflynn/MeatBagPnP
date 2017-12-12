@@ -12,8 +12,8 @@ See the following video for a demo: https://www.youtube.com/watch?v=3arWSPCR0Ww 
 The tool runs on Python 2.7, which is still around in 2040.
 
 ### Dependencies
+Pyside
 
-Yes
 
 ### Scanner Setup
 
