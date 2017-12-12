@@ -107,7 +107,7 @@ class MeatBagWindow(QtGui.QMainWindow):
     
     def __init__(self):
         super(MeatBagWindow, self).__init__()
-        self.setWindowTitle("Meat Bag Pick-n-Place v0.0000000001")
+        self.setWindowTitle("Meat Bag Pick-n-Place v0.0000000002")
 
         self.efilter = filterObj(self)
         self.installEventFilter(self.efilter)
@@ -140,6 +140,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.col_y = 5
         self.col_pn = 8
         self.col_des = 0
+        self.col_com = 1
 
         #Starting data row (row=0 is often header)
         self.row_start = 1
@@ -259,16 +260,19 @@ class MeatBagWindow(QtGui.QMainWindow):
         """User click on a cell"""
 
         pn = self.table.item(row, self.col_pn).text()
+        com = self.table.item(row, self.col_com).text()
+        
         if pn is None or pn == "":
-            raise ValueError("Null PN for row - match will fail, sorry about that.")
-
-        self.process_new_pn(pn)
+            #raise ValueError("Null PN for row - matching with Comment")
+            self.process_new_com(com)
+        else:
+            self.process_new_pn(pn)
 
 
     def openFile(self):
         """Open new CSV PnP file"""
 
-        filename, filter = QtGui.QFileDialog.getOpenFileName(parent=self, caption='Select PnP file', dir='.', filter='CSV files (*.csv)')
+        filename, filter = QtGui.QFileDialog.getOpenFileName(parent=self, caption='Select PnP file', dir='.', filter='CSV files (*.csv *.mnt)')
 
         if not filename:
             return
@@ -305,6 +309,11 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.pdb = []
         for r in range(0, numRows):
             self.pdb.append(ppdata[r][self.col_pn])
+
+        self.pdc = []
+        for r in range(0, numRows):
+            self.pdc.append(ppdata[r][self.col_com])
+
 
     def recolourTable(self):
         """Redo the table colour stuff"""
@@ -363,7 +372,7 @@ class MeatBagWindow(QtGui.QMainWindow):
     def process_new_scan(self, scan):
         """Process a new barcode scan, convert to manufacture PN"""
         if len(scan) < 5:
-            print "Scan probably too short, ignoring"
+            print ("Scan probably too short, ignoring")
             return
 
         self.topDes.setText("")
@@ -412,10 +421,43 @@ class MeatBagWindow(QtGui.QMainWindow):
         try:
             pn = html.split('<div id="divManufacturerPartNum">')[1].split("</div>")[0]
             pn = pn.split('<h1>')[1].split('</h1>')[0]
-            print "Found PN: " + pn
+            print ("Found PN: " + pn)
             self.process_new_pn(pn)
         except IndexError:
-            print "Failed to find PN in returned site."
+            print ("Failed to find PN in returned site.")
+
+    def process_new_com(self, com, update_placement=True):
+        """Given a Comment, find all likely matches"""
+        matchlist = []
+
+        #Shitty match for shitty programs
+        
+
+        for i in range(0, len(self.pdc)):
+            #print "checking"
+            if (len(self.pdc[i]) > 3 and self.pdc[i] in com) or com in self.pdc[i]:
+                matchlist.append(i)
+        #print matchlist
+
+        self.topDesList = []
+        self.botDesList = []
+        topDesStr = ""
+        botDesStr = ""
+
+        for r in matchlist:
+            if self.isTopLayer(r):
+                self.topDesList.append(r)
+                topDesStr += self.table.item(r, self.col_des).text() + ", "
+            else:
+                self.botDesList.append(r)
+                botDesStr += self.table.item(r, self.col_des).text() + ", "
+
+        self.topDes.setText(topDesStr)
+        self.botDes.setText(botDesStr)
+
+        if update_placement:
+            self.find_next_placement()   
+
 
     def process_new_pn(self, pn, update_placement=True):
         """Given a manufactures PN, find all likely matches"""

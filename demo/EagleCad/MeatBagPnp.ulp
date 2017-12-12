@@ -1,0 +1,472 @@
+#usage "en:<b><qt>Data generation for mounting machines </b><br>"
+       "Export of data for SMD and THT can be in separated files.<br>"
+       "<author>Author: support@cadsoft.de</author></qt>",
+       "de:<qt><b>Datengenerierung für Bestückungsautomaten </b><p>"
+       "Exportiert die Daten für SMD- und THT-Bauteile ggf. in getrennte Dateien.<br>"
+       "<author>Author: support@cadsoft.de</author></qt>"
+
+// THIS PROGRAM IS PROVIDED AS IS AND WITHOUT WARRANTY OF ANY KIND, EXPRESSED OR IMPLIED
+
+string Version = "0.0.2";  // 1.0.0 - 2011-11-23
+
+#require 5.1100
+
+// History
+// 1.0.0 - 2011-11-23
+// 1.0.1 - 2016-01-21  support@cadsoft.de, output file names changed
+// 1.0.2 - 2016-07-18  support@cadsoft.de, added contact typ to output
+
+
+string AttributeFeederAngleOffset = "FAO"; // feeder angle offset to part
+real   FeederAngleOffset[];
+
+real   AngleLayoutFeeder = 0.0;              // offset between feeder and placed PCB on mounting machine
+
+string ExpAttrName = "MPN";                  // Manufacturer Part Number
+char   delimiter = ',';
+char   quote = '"';
+string Passer;
+string EName[];
+string EPack[];
+string EValue[];
+string EAttr[];
+real   Ex[], Ey[], Ea[];
+real   Eox[], Eoy[];
+real   ExC[], EyC[];     // calculated center by smd
+int    Em[];
+string tb[] = {"TopLayer", "BottomLayer" };
+string smdthtString[] = {"SMD", "THT"};
+
+int    PacSmd[];
+int    PacPad[];
+int    SmdTht[];
+int    SMD_THT = 2;     // 2 = SMD & PAD
+enum   { SMD, THT };
+int    SmdThtSeparate = 1;
+
+int    cnte = 0;
+int    sele = -1;
+string SelPasser[];
+int    SelM1 = -1;
+
+string EList[];
+int    selCalculated = 0;
+int    useMarker;
+
+int    maxX = INT_MIN;
+int    minX = INT_MAX;
+int    maxY = INT_MIN;
+int    minY = INT_MAX;
+
+real   outlines = 0;
+string brdoutline;
+string brdmaximum = "max. Board length ?\n(layer 20 empty)";
+
+int    index[];
+
+
+/****************** Functions ***********************/
+void header(string bname) {
+  int t = time();
+  //                    |Package_Value|  MPN Attribute|
+  //                    \______               ________/
+  //                           \             /
+  //printf("      \"NAME\" = ( \"DESCRIPTION\"%c\"\"%c%c%c x-cord%c y-cord%c rotation%c \"SIDE\")\n",
+  //       delimiter, delimiter, delimiter, delimiter, delimiter, delimiter, delimiter
+  //      );
+  return;
+}
+
+real ArcLength(real ang1, real ang2, real radius) {
+  return radius  * 2 * PI / 360 * (ang2 - ang1);
+}
+
+void checkmaxmin(int x1, int x2, int y1, int y2, int width) {
+  int w = 0;
+  if (width) w = width/2;
+  if (x1 > maxX) maxX = x1+w;
+  if (x2 > maxX) maxX = x2+w;
+  if (y1 > maxY) maxY = y1+w;
+  if (y2 > maxY) maxY = y2+w;
+  if (x1 < minX) minX = x1-w;
+  if (x2 < minX) minX = x2-w;
+  if (y1 < minY) minY = y1-w;
+  if (y2 < minY) minY = y2-w;
+  return;
+}
+
+
+void checkarc( int x1, int x2, int y1, int y2, int xc, int yc, real angle1, real angle2, real radius, int width) {
+  checkmaxmin( x1, x2, y1, y2, width );
+  if     ( angle2 > angle1 + 270.0) {
+    if     ( angle1 < 90  ) checkmaxmin( x1         , xc - radius, yc + radius, yc - radius, width );
+    else if( angle1 < 180 ) checkmaxmin( xc - radius, xc + radius, y1         , yc - radius, width );
+    else if( angle1 < 270 ) checkmaxmin( x1         , xc + radius, yc - radius, yc + radius, width );
+    else if( angle1 < 360 ) checkmaxmin( xc + radius, xc - radius, y1         , yc + radius, width );
+  }
+  else if( angle2 > angle1 + 180.0) {
+    if     ( angle1 < 90  ) checkmaxmin( x1         , xc - radius, yc + radius, y2         , width );
+    else if( angle1 < 180 ) checkmaxmin( x1         , xc - radius, yc - radius, y2         , width );
+    else if( angle1 < 270 ) checkmaxmin( x1         , xc + radius, yc - radius, y2         , width );
+    else if( angle1 < 360 ) checkmaxmin( x1         , xc + radius, yc + radius, y2         , width );
+  }
+  else if( angle2 > angle1 + 90.0 ) {
+    if     ( angle1 < 90  ) checkmaxmin( x1         , x2         , yc + radius, y2         , width );
+    else if( angle1 < 180 ) checkmaxmin( x1         , xc - radius, y1         , y2         , width );
+    else if( angle1 < 270 ) checkmaxmin( x1         , x2         , yc - radius, y2         , width );
+    else if( angle1 < 360 ) checkmaxmin( x1         , xc + radius, y1         , y2         , width );
+  }
+  return;
+}
+
+
+real WireLength(int x1, int x2, int y1, int y2) {
+  return sqrt( pow(u2mm(x2) - u2mm(x1), 2) + pow(u2mm(y2) - u2mm(y1), 2));
+}
+
+
+real WireLengthCircle(int r) {
+  return (u2mm(r) * 2 * PI) ;
+}
+
+
+string getAngle(string ang) {
+  real angc = strtod(ang);
+  int Result = dlgDialog("Angle") {
+    dlgHBoxLayout {
+      dlgLabel("Feeder offset ");
+      dlgRealEdit(angc, -359.9, +359.9);
+      dlgStretch(1);
+    }
+    dlgHBoxLayout {
+      dlgStretch(1);
+      dlgPushButton("+OK") dlgAccept();
+      dlgPushButton("-Cancel") dlgReject();
+      dlgStretch(1);
+    }
+  };
+  if (!Result) return ang;
+  sprintf(ang, "%.1f", angc);
+  return ang;
+}
+
+
+/*** write back attribute value in to board ***/
+void exitfeederangle(string bname) {  // write back changed feeder angle offset
+  string scriptname = filesetext(bname, "~fao~.scr");
+  string cmd, s;
+  cmd = "CHANGE DISPLAY OFF;\n";
+  for (int n = 0; n < cnte; n++) {
+    sprintf(s, "ATTRIBUTE %s '%s' '%.1f';\n", EName[n], AttributeFeederAngleOffset, FeederAngleOffset[n]);
+    cmd += s;
+  }
+  output(scriptname, "wtD") printf("%s", cmd);
+  exit("SCRIPT '"+scriptname+"'");
+}
+
+
+void prn(int n, real x, real y, real partangle, int withTyp) {
+  if (withTyp == 1)
+  printf("%c%s%c%s%c%s%c%s%c%.4f%c%.4f%c%.1f%c%s%c%s\n",
+                EName[index[n]],
+                delimiter,
+                EValue[index[n]],
+                delimiter,
+                tb[Em[index[n]]],
+                delimiter,
+                EPack[index[n]],
+                delimiter,
+                x,
+                delimiter,
+                y,
+                delimiter,
+                partangle,
+		            delimiter,
+                smdthtString[SmdTht[index[n]]],
+                delimiter,
+                EAttr[index[n]]
+	              
+                
+                
+                //FeederAngleOffset[index[n]],
+                //SelPasser[index[n]]
+         );
+  else
+  printf("%s%c%s%c%s%c%s%c%.4f%c%.4f%c%.1f%c%s%c%s\n",
+                EName[index[n]],
+                delimiter,
+                EValue[index[n]],
+                delimiter,
+                tb[Em[index[n]]],
+                delimiter,
+                EPack[index[n]],
+                delimiter,
+                x,
+                delimiter,
+                y,
+                delimiter,
+                partangle,
+                delimiter,
+                smdthtString[SmdTht[index[n]]],
+	              delimiter,
+	              EAttr[index[n]]
+                //FeederAngleOffset[index[n]],
+                //SelPasser[index[n]]
+         );
+  return;
+}
+
+/****  main ****/
+if (board) board(B) {
+  B.wires(W) {
+    if (W.layer == 20) {
+      if (W.arc) {
+        outlines += ArcLength(W.arc.angle1, W.arc.angle2, W.arc.radius);
+        checkarc(W.arc.x1, W.arc.x2, W.arc.y1, W.arc.y2, W.arc.xc, W.arc.yc, W.arc.angle1, W.arc.angle2, W.arc.radius, W.width);
+      }
+      else {
+        outlines += WireLength(W.x1, W.x2, W.y1, W.y2);
+        checkmaxmin( W.x1, W.x2, W.y1, W.y2, W.width );
+      }
+    }
+  }
+  B.circles(C) {
+    if (C.layer == 20) {
+      outlines += WireLengthCircle(C.radius);
+      checkmaxmin( C.x - C.radius, C.x + C.radius, C.y - C.radius, C.y + C.radius, C.width );
+    }
+  }
+  B.elements(E) {
+    E.package.wires(W) {
+      if (W.layer == 20) {
+        // *** Dimension in Packages ***
+        outlines += WireLength(W.x1, W.x2, W.y1, W.y2);
+        checkmaxmin( W.x1, W.x2, W.y1, W.y2, W.width );
+      }
+    }
+    E.package.circles(C) {
+      if (C.layer == 20) {
+        outlines += WireLengthCircle(C.radius);
+        checkmaxmin( C.x - C.radius, C.x + C.radius, C.y - C.radius, C.y + C.radius, C.width );
+      }
+    }
+  }
+  if (outlines) {
+     sprintf(brdoutline, "Outline contour = %.4f mm", outlines);
+     sprintf(brdmaximum, "max. Board length (Layer 20)%cX = %.4f mm%cY = %.4f mm",
+               delimiter, WireLength(minX, maxX, 0,0), delimiter, WireLength(minY, maxY, 0, 0)
+            );
+  }
+
+  B.elements(E) {
+    int xmax =-2147483648,
+    xmin = 2147483647,
+    ymax = xmax,
+    ymin = xmin;
+
+    E.package.contacts(C) {
+      if (C.x > xmax) xmax = C.x;
+      if (C.y > ymax) ymax = C.y;
+      if (C.x < xmin) xmin = C.x;
+      if (C.y < ymin) ymin = C.y;
+      if (C.pad) PacPad[cnte]++;
+      if (C.smd) PacSmd[cnte]++;
+    }
+
+    if (PacSmd[cnte] || PacPad[cnte]) {  // if connect
+      Ex[cnte] = u2mm((xmin + xmax)/2);  // element coordinate calculated over smd/pad
+      Ey[cnte] = u2mm((ymin + ymax)/2);
+    }
+    if (PacPad[cnte]) SmdTht[cnte] = THT;
+    if (PacSmd[cnte]) SmdTht[cnte] = SMD;  // if SMD THT mixed, then favorite SMD
+
+    Eox[cnte] = u2mm(E.x);  // element origin
+    Eoy[cnte] = u2mm(E.y);
+    Ea[cnte] = E.angle;
+    EValue[cnte] = E.value;
+    Em[cnte] = E.mirror;
+    EName[cnte] = E.name;
+    EPack[cnte] = E.package.name;
+
+    if (E.attribute[AttributeFeederAngleOffset]) {  // "FAO" feeder offset of part for mountig machine
+       FeederAngleOffset[cnte] = strtod(E.attribute[AttributeFeederAngleOffset]);
+    }
+    else FeederAngleOffset[cnte] = 0.0;
+
+    if (E.attribute[ExpAttrName]) {
+      EAttr[cnte] = E.attribute[ExpAttrName];
+    }
+    else {
+      EAttr[cnte] =  "";
+    }
+
+    cnte++;
+  }
+
+  sort(cnte, index, Em, SmdTht, EValue, EPack, EAttr);
+
+  for (int i = 0; i < cnte; i++) {
+    //Partname, Value, Package, Position, Orientation, Angabe TOP bzw BOT,MPN
+    sprintf(EList[i], "%s\t%s\t%s\t%.4f\t%.4f\t%.1f\t%s\t%s\t%s",
+                      EName[index[i]],
+                      EValue[index[i]],
+                      EPack[index[i]],
+                      Eox[index[i]],
+                      Eoy[index[i]],
+                      Ea[index[i]],
+                      tb[Em[index[i]]],
+		      smdthtString[SmdTht[index[i]]],
+                      EAttr[index[i]]
+                      //FeederAngleOffset[index[i]],
+                      //SelPasser[index[i]]
+           );
+  }
+
+  int writeback = 0;
+
+  int RESULT = dlgDialog("Mounting Data") {
+    string t[];
+    enum { M, A};
+    int changemode = M;
+    int srt = 0;
+    dlgHBoxLayout dlgSpacing(500);
+    dlgHBoxLayout {
+      dlgVBoxLayout dlgSpacing(300);
+      dlgVBoxLayout {
+        dlgListView("Designator\tComment\tFootprint\tCenter-X(mm)\tCenter-Y(mm)\tRotation\tLayer\tSMD/THT\tManufacture Part Number 1", EList, sele, srt) {
+          /*******************************************************
+          strsplit(t, EList[sele], '\t');
+          if (changemode == M) {
+            if (SelPasser[sele] == "M") SelPasser[sele] = "";
+            else {
+              SelPasser[sele] = "M"; useMarker = 1;
+              if (!SelM1) {
+                SelM1 = sele+1;
+                useMarker = sele+1;
+              }
+            }
+            sprintf(EList[sele], "%s\t%s\t%s\t%s\t%s\t%s", t[0], t[1], t[2], t[3], t[4], SelPasser[sele]);
+          }
+          else if (changemode == A) {
+            t[4] = getAngle(t[4]);
+            sprintf(EList[sele], "%s\t%s\t%s\t%s\t%s\t%s", t[0], t[1], t[2], t[3], t[4], t[5]);
+            FeederAngleOffset[sele] = strtod(t[4]);
+          }
+          *******************************************************/
+        }
+      }
+    }
+    /*******************************************************
+    dlgHBoxLayout {
+      dlgGroup("Change mode ") {
+        dlgRadioButton("&Marker ", changemode);
+        dlgHBoxLayout {
+          dlgRadioButton("&Feeder angle ", changemode);
+          dlgCheckBox("&Write feeder back in pcb ", writeback);
+        }
+      }
+    }
+    dlgGroup("Angle offset ") {
+      dlgHBoxLayout {
+        dlgLabel("Feeder/&Board ");
+        dlgRealEdit(AngleLayoutFeeder);
+        dlgStretch(1);
+      }
+    }
+    *******************************************************/
+    dlgHBoxLayout {
+      dlgGroup("Export Packages ") {
+        dlgRadioButton("only &SMD", SMD_THT);
+        dlgRadioButton("only &PAD", SMD_THT);
+        dlgHBoxLayout {
+          dlgRadioButton("SMD &and PAD", SMD_THT);
+          dlgCheckBox("SMD/THT in separate files", SmdThtSeparate);
+        }
+      }
+      dlgGroup("Center") {
+        dlgRadioButton("&Origin center", selCalculated);
+        dlgRadioButton("&Calculated center (by PADs)", selCalculated);
+        //dlgCheckBox("&Use marker package", useMarker);
+        dlgStretch(1);
+      }
+    }
+    dlgHBoxLayout {
+      dlgPushButton("OK") {
+        if (useMarker) {
+          if (sele < 0) dlgMessageBox("First select e element (Marker)!", "OK");
+          else dlgAccept();
+        }
+        else dlgAccept();
+      }
+      dlgPushButton("-CANCEL") dlgReject();
+      dlgStretch(1);
+    }
+  };
+  if (!RESULT) exit(-1);
+
+  //string fileName = dlgFileSave("Save File", filesetext(B.name, ".mnt"), "*.mnt");
+  string fileName = filesetext(B.name, ".mnt");
+  string smdfilename = filesetext(B.name, "-smd.mnt");
+  string thtfilename = filesetext(B.name, "-tht.mnt");
+  if (SmdThtSeparate) {
+    output(thtfilename, "wt");  // generate new file
+    output(smdfilename, "wt");
+  }
+
+  if (fileName == "") exit(0);
+  output(fileName) {
+    int cnt = 0;
+    int cntpad = 0;
+    int cntsmd = 0;
+    int cntmarkt = 0;  // counter marker on top
+    int cntmarkb = 0;  // counter marker on bottom
+    header(B.name);
+    output(thtfilename, "at")printf("Designator,Comment,Layer,Footprint,Center-X(mm),Center-Y(mm),Rotation,SMD/THT,Manufacture Part Number 1\n");
+    output(smdfilename, "at")printf("Designator,Comment,Layer,Footprint,Center-X(mm),Center-Y(mm),Rotation,SMD/THT,Manufacture Part Number 1\n");                  
+    for (int n = 0; n < cnte; n++) {
+      if (!SMD_THT && !PacPad[index[n]] || SMD_THT == 1 && !PacSmd[index[n]] || SMD_THT == 2) {
+        if (PacPad[index[n]]) cntpad++;
+        if (PacSmd[index[n]]) cntsmd++;
+        cnt++;
+
+        if (SelPasser[index[n]] == "M") {   //  select marker
+          sprintf(EValue[index[n]], "MARKER");
+          if (Em[index[n]]) {
+            sprintf(EName[index[n]], "MARKER %d", ++cntmarkb);
+          }
+          else {
+            sprintf(EName[index[n]], "MARKER %d", ++cntmarkt);
+          }
+        }
+
+        //string pac_val_delim = "_";
+        //if (!EValue[index[n]]) pac_val_delim = "";  // no delimiter if no value
+
+        real x = Eox[index[n]];  // element origin
+        real y = Eoy[index[n]];
+
+        if (selCalculated) {  // element origin calculated over smd/pad
+          x = Ex[index[n]];
+          y = Ey[index[n]];
+        }
+        real partangle = Ea[index[n]] + FeederAngleOffset[index[n]] + AngleLayoutFeeder;
+        if (partangle > 360) partangle -= 360;
+        if (partangle < -360) partangle += 360;
+
+        if (SmdThtSeparate) {
+          if (SmdTht[index[n]] == SMD) output(smdfilename, "at") prn(n, x ,y, partangle, 0);
+          if (SmdTht[index[n]] == THT) output(thtfilename, "at") prn(n, x ,y, partangle, 0);
+        }
+        else {
+          prn(n, x ,y, partangle, 1);
+        }
+      }
+    }
+  }
+  // if (writeback) exitfeederangle(B.name);
+}
+
+else {
+   dlgMessageBox("Start this ULP in a Board.");
+   exit (0);
+}
