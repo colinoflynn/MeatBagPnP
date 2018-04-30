@@ -97,3 +97,12 @@ The tool uses web scraping style stuff right now. Digikey & Mouser have APIs tha
 ### Phone App
 
 One day this thing might exist as a phone app, allowing you to do everything (take photo of PCB, scan barcodes, etc). This will have to wait until I know how to write phone apps. Be assured when it does become released, the screen will be so obscured with advertising it will be almost unusable, and inexplicitly require permissions to send text messages.
+
+# About/License
+
+MeatbagPnP is a community project with the following authors:
+
+* Colin O'Flynn (@colinoflynn: original author)
+* @pikokosan (added Eagle support and examples)
+* Pat Deegan (@psychogenic: added Kicad support + many features including matching all parts, different file formats, hotkeys etc)
+
