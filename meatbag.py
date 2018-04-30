@@ -1,5 +1,7 @@
+#!/usr/bin/env python
 import csv
 import sys
+import argparse
 from PySide import QtGui, QtCore, QtWebKit
 from urllib import urlopen
 
@@ -30,14 +32,15 @@ class PCBPainter(QtGui.QDialog):
         self.pcbheight.setMinimum(0)
         self.pcbheight.setMaximum(100000)
         self.pcbheight.valueChanged.connect(self.clearfocusdelay)
+        self.marker_diameter = 5
 
         buttongrid = QtGui.QHBoxLayout()
         buttongrid.addWidget(openpb)
         buttongrid.addSpacing(5)
-        buttongrid.addWidget(QtGui.QLabel("PCB Width (PnP file units): "))
+        buttongrid.addWidget(QtGui.QLabel("PCB Width (units): "))
         buttongrid.addWidget(self.pcbwidth)
         buttongrid.addSpacing(5)
-        buttongrid.addWidget(QtGui.QLabel("PCB Height (PnP file units):"))
+        buttongrid.addWidget(QtGui.QLabel("PCB Height (units):"))
         buttongrid.addWidget(self.pcbheight)
         buttongrid.addStretch(5)
 
@@ -47,9 +50,23 @@ class PCBPainter(QtGui.QDialog):
 
         self.image_path = ""
 
-    def xy_to_draw(self, x, y, mirror):
+    def marker_diameter_increment(self):
+        self.marker_diameter += 10
+        # used as key action callback, so return true to redraw
+        return True
 
-        self.reload_base()
+    def marker_diameter_decrement(self):
+        if self.marker_diameter < 10:
+            return False
+        
+        self.marker_diameter -= 10
+        # used as key action callback, so return true to redraw
+        return True
+
+
+
+    def draw_marker(self, x, y, mirror=False):
+        """Draw a placement marker"""
 
         boardwidth = self.pcbwidth.value()
         boardheight = self.pcbheight.value()
@@ -66,54 +83,148 @@ class PCBPainter(QtGui.QDialog):
 
         #Y taken from wrong side normally
         y = self.base.height() - y
-
+        
         if mirror:
             x = self.base.width() - x
-
+        
+        #print("Drawing marker at %d, %d" % (x,y))
         center = QtCore.QPoint(x, y)
-
+        
         painter = QtGui.QPainter()
         painter.begin(self.base)
+        painter.setBrush(QtCore.Qt.black)
+        painter.setOpacity(0.45)
+        painter.drawEllipse(QtCore.QPoint(x+(float(0.15*self.marker_diameter)), y+(float(0.15*self.marker_diameter))), self.marker_diameter, self.marker_diameter)
+        painter.end()
+        
+        painter.begin(self.base)
         painter.setBrush(QtCore.Qt.red)
-        painter.drawEllipse(center, 5, 5)
+        painter.setOpacity(0.95)
+        painter.drawEllipse(center, self.marker_diameter, self.marker_diameter)
         painter.end()
 
+    def xy_to_draw(self, x, y, mirror):
+
+        self.reload_base()
+
+        self.draw_marker(x, y, mirror)
+        
         self.redraw()
+    
 
     def reload_base(self):
         self.base = QtGui.QImage(self.image_path)
 
     def redraw(self):
         self.imglabel.setPixmap(QtGui.QPixmap.fromImage(self.base))
-
-    def set_image(self):
-        filename, filter = QtGui.QFileDialog.getOpenFileName(parent=self, caption='Select PCB Image', dir='.',
-                                                             filter='PCB Image (*.png)')
-
+    
+    def configure_pcb_dimensions(self, height, width):
+        self.pcbwidth.setValue(width)
+        self.pcbheight.setValue(height)
+    
+    def image_selected(self, filename):
         if filename:
             self.image_path = filename
             self.reload_base()
             self.redraw()
 
+    def set_image(self):
+        filename, filter = QtGui.QFileDialog.getOpenFileName(parent=self, caption='Select PCB Image', dir='.',
+                                                             filter='PCB Image (*.png)')
+
+        self.image_selected(filename)
+
     def clearfocusdelay(self):
-        """"After 5 seconds clear focus, used to avoid accidently writing stuff here with scan gun"""
+        """After 5 seconds clear focus, used to avoid accidently writing stuff here with scan gun"""
         self.timerFocus.start(5000)
 
     def clearfocus(self):
         self.pcbwidth.clearFocus()
         self.pcbheight.clearFocus()
 
+
+class MeatBagCSVSettings(object):
+    def __init__(self):
+        self.col_layer = 0
+        self.col_x = 0
+        self.col_y = 0
+        self.col_pn = 0
+        self.col_des = 0
+        self.col_com = 0
+
+        #Starting data row (row=0 is often header)
+        self.row_start = 0
+
+
+class MeatBagCSVSettingsAltium(MeatBagCSVSettings):
+    def __init__(self):
+        super(MeatBagCSVSettingsAltium, self).__init__()
+        self.col_layer = 2
+        self.col_x = 4
+        self.col_y = 5
+        self.col_pn = 8
+        self.col_des = 0
+        self.col_com = 1
+
+        #Starting data row (row=0 is often header)
+        self.row_start = 1
+
+
+class MeatBagCSVSettingsKicadSingleLayer(MeatBagCSVSettings):
+    def __init__(self):
+        super(MeatBagCSVSettings, self).__init__()
+        #Default kicad .pos file layout: Ref,Val,Package,PosX,PosY,Rot,Side,
+        # e.g. "C1","100n","C_0805_2012Metric",94.500000,-65.500000,90.000000,top
+
+        self.col_layer = -1
+        self.col_x = 3
+        self.col_y = 4
+        self.col_pn = 1
+        self.col_des = 0
+        self.col_com = 1
+
+        #Starting data row (row=0 is often header)
+        self.row_start = 1
+
+class MeatBagCSVSettingsKicadMultiLayer(MeatBagCSVSettingsKicadSingleLayer):
+    def __init__(self):
+        super(MeatBagCSVSettingsKicadMultiLayer, self).__init__()
+        #Default kicad .pos file layout: Ref,Val,Package,PosX,PosY,Rot,Side
+        self.col_layer = 6
+
+
+class KeyAction(object):
+    """ action associated with a key """
+    def __init__(self, key, callback):
+        self.key = key.lower()
+        self.cb = callback
+    def matches(self, txt):
+        if txt is None:
+            return False
+        if self.key == txt.lower():
+            return True
+        return False
+    
+    def trigger(self):
+        return self.cb()
+
+
 class MeatBagWindow(QtGui.QMainWindow):
     
-    def __init__(self):
+    def __init__(self, csvSettings, parsedArgs):
         super(MeatBagWindow, self).__init__()
-        self.setWindowTitle("Meat Bag Pick-n-Place v0.0000000002")
+        self.setWindowTitle("Meat Bag Pick-n-Place v0.0000000003")
 
         self.efilter = filterObj(self)
         self.installEventFilter(self.efilter)
 
         self.initLayout()
         self.initMenus()
+        if csvSettings:
+            self.csv_settings = csvSettings;
+        else:
+            self.csv_settings = MeatBagCSVSettingsAltium()
+
         self.getSettings()
         self.show()
 
@@ -132,18 +243,23 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.build_side = 0
 
         self.cur_placement = None
+        self.drawing_all_same_value = False
+        if parsedArgs is None:
+            return
+        # handle cmd line args
+        if parsedArgs.image:
+            self.pcbpainter.image_selected(parsedArgs.image)
+        
+        if parsedArgs.width and parsedArgs.height:
+            self.pcbpainter.configure_pcb_dimensions(parsedArgs.height, parsedArgs.width)
+        
+        if parsedArgs.csv:
+            self.parseCSVFile(parsedArgs.csv)
 
     def getSettings(self):
         """Configure settings. Eventually ask user, for now configure in source."""
-        self.col_layer = 2
-        self.col_x = 4
-        self.col_y = 5
-        self.col_pn = 8
-        self.col_des = 0
-        self.col_com = 1
+	pass
 
-        #Starting data row (row=0 is often header)
-        self.row_start = 1
         
     def initLayout(self):
         mainLayout = QtGui.QVBoxLayout()
@@ -242,14 +358,17 @@ class MeatBagWindow(QtGui.QMainWindow):
 
     def isTopLayer(self, row):
         """Check if a given row (0-based index) is top-side or bottom-side part"""
-        tb = self.table.item(row, self.col_layer).text()
+        if self.csv_settings.col_layer < 0:
+            return True
+
+        tb = self.table.item(row, self.csv_settings.col_layer).text()
 
         if tb.lower().startswith("top"):
             return True
         elif tb.lower().startswith("bot"):
             return False
         else:
-            raise ValueError("Unknown layer for row %d" % row)
+            raise ValueError("Unknown layer for row %d: '%s' in col %d" % (row, tb.lower(), self.csv_settings.col_layer))
 
     def sideSelectionChanged(self, indx):
         """User changed build side"""
@@ -259,8 +378,8 @@ class MeatBagWindow(QtGui.QMainWindow):
     def table_cellClicked(self, row, col):
         """User click on a cell"""
 
-        pn = self.table.item(row, self.col_pn).text()
-        com = self.table.item(row, self.col_com).text()
+        pn = self.table.item(row, self.csv_settings.col_pn).text()
+        com = self.table.item(row, self.csv_settings.col_com).text()
         
         if pn is None or pn == "":
             #raise ValueError("Null PN for row - matching with Comment")
@@ -276,14 +395,17 @@ class MeatBagWindow(QtGui.QMainWindow):
 
         if not filename:
             return
+        
+        return self.parseCSVFile(filename)
 
+    def parseCSVFile(self, filename):
         ppdata = []
         
         with open(filename, "rb") as csvfile:
             ppfile = csv.reader(csvfile, delimiter=',', quotechar='"')
             for row in ppfile:
                 if len(row) < 4:
-                    print("Skipped line: " + ' '.join(row))
+                    print("Skipped line: " +  ' '.join(row))
                 else:
                     ppdata.append(row)
 
@@ -308,11 +430,11 @@ class MeatBagWindow(QtGui.QMainWindow):
         #Rebuild local database of part numbers to speed up search
         self.pdb = []
         for r in range(0, numRows):
-            self.pdb.append(ppdata[r][self.col_pn])
+            self.pdb.append(ppdata[r][self.csv_settings.col_pn])
 
         self.pdc = []
         for r in range(0, numRows):
-            self.pdc.append(ppdata[r][self.col_com])
+            self.pdc.append(ppdata[r][self.csv_settings.col_com])
 
 
     def recolourTable(self):
@@ -320,7 +442,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         rowcnt = self.table.rowCount()
         colcnt = self.table.columnCount()
 
-        for r in range(self.row_start, rowcnt):
+        for r in range(self.csv_settings.row_start, rowcnt):
             try:
                 placed = self.table.item(r, colcnt-1).checkState() == QtCore.Qt.Checked
                 if placed:
@@ -368,11 +490,27 @@ class MeatBagWindow(QtGui.QMainWindow):
         #This triggers scan stuff
         self.scanLine.setPlainText(scan)
 
+    def process_keystroke(self, txt):
+        action_map = [
+            KeyAction('+', self.pcbpainter.marker_diameter_increment),
+            KeyAction('-', self.pcbpainter.marker_diameter_decrement),
+            KeyAction('a', self.toggle_draw_all_of_current_value)
+        ]
+        refresh_placement = False
+        for k in action_map:
+            if k.matches(txt):
+                #print("Have match")
+                if k.trigger():
+                    #print("Should refresh")
+                    refresh_placement = True
+        
+        if refresh_placement:
+            self.update_placement()
 
     def process_new_scan(self, scan):
         """Process a new barcode scan, convert to manufacture PN"""
         if len(scan) < 5:
-            print ("Scan probably too short, ignoring")
+            self.process_keystroke(scan)
             return
 
         self.topDes.setText("")
@@ -447,10 +585,10 @@ class MeatBagWindow(QtGui.QMainWindow):
         for r in matchlist:
             if self.isTopLayer(r):
                 self.topDesList.append(r)
-                topDesStr += self.table.item(r, self.col_des).text() + ", "
+                topDesStr += self.table.item(r, self.csv_settings.col_des).text() + ", "
             else:
                 self.botDesList.append(r)
-                botDesStr += self.table.item(r, self.col_des).text() + ", "
+                botDesStr += self.table.item(r, self.csv_settings.col_des).text() + ", "
 
         self.topDes.setText(topDesStr)
         self.botDes.setText(botDesStr)
@@ -476,16 +614,51 @@ class MeatBagWindow(QtGui.QMainWindow):
         for r in matchlist:
             if self.isTopLayer(r):
                 self.topDesList.append(r)
-                topDesStr += self.table.item(r, self.col_des).text() + ", "
+                topDesStr += self.table.item(r, self.csv_settings.col_des).text() + ", "
             else:
                 self.botDesList.append(r)
-                botDesStr += self.table.item(r, self.col_des).text() + ", "
+                botDesStr += self.table.item(r, self.csv_settings.col_des).text() + ", "
 
         self.topDes.setText(topDesStr)
         self.botDes.setText(botDesStr)
 
         if update_placement:
             self.find_next_placement()
+
+    def toggle_draw_all_of_current_value(self):
+        #print("draw_all_of_current_value")
+        if self.cur_placement is None or not self.cur_placement:
+            print("NO CUR PLACEMENT")
+            return False
+        
+        if self.drawing_all_same_value:
+            self.drawing_all_same_value = False
+            self.update_placement()
+            return
+
+        if self.build_side == 0:
+            parts = self.topDesList
+        else:
+            parts = self.botDesList
+        cur_part_num_txt = self.table.item(self.cur_placement, self.csv_settings.col_pn).text()
+        matchingPartsPos = []
+        for p in parts:
+            if p != self.cur_placement and  self.table.item(p, self.csv_settings.col_pn).text() == cur_part_num_txt:
+                matchingPartsPos.append([float(self.table.item(p, self.csv_settings.col_x).text()), 
+                                       float(self.table.item(p, self.csv_settings.col_y).text())])
+
+        if not len(matchingPartsPos):
+            print("No matching parts")
+            return False
+        self.update_placement()
+        for pos in matchingPartsPos:
+            self.pcbpainter.draw_marker(pos[0], pos[1])
+
+        
+        self.drawing_all_same_value = True
+        self.pcbpainter.redraw()
+        return False
+        
 
     def find_next_placement(self):
         """Check the list for unplaced part on active layer"""
@@ -509,12 +682,12 @@ class MeatBagWindow(QtGui.QMainWindow):
 
     def update_placement(self):
         """Using variable self.cur_placement, update display to show location, name, etc."""
-
+        self.drawing_all_same_value = False
         if self.cur_placement is not None:
-            self.place.setText(self.table.item(self.cur_placement, self.col_des).text())
+            self.place.setText(self.table.item(self.cur_placement, self.csv_settings.col_des).text())
 
-            self.pcbpainter.xy_to_draw(float(self.table.item(self.cur_placement, self.col_x).text()),
-                                       float(self.table.item(self.cur_placement, self.col_y).text()),
+            self.pcbpainter.xy_to_draw(float(self.table.item(self.cur_placement, self.csv_settings.col_x).text()),
+                                       float(self.table.item(self.cur_placement, self.csv_settings.col_y).text()),
                                        self.isTopLayer(self.cur_placement) == False)
 
         else:
@@ -551,9 +724,27 @@ class filterObj(QtCore.QObject):
 
         
 def main():
+    parser = argparse.ArgumentParser(description='MeatBagPnP')
+    parser.add_argument('--csv', dest='csv',  help='CSV file to use')
+    parser.add_argument('--format', dest='format', default='altium', help='CSV file format (altium|kicad|eagle)')
+    parser.add_argument('--width', type=float, default=0.0, help='PCB width')
+    parser.add_argument('--height', type=float, default=0.0, help='PCB height')
+    parser.add_argument('--image')
+    args = parser.parse_args()
+    csvSettingsAvailable = dict(
+        altium = MeatBagCSVSettingsAltium(),
+        eagle = MeatBagCSVSettingsAltium(), # same as altium for now
+        kicad = MeatBagCSVSettingsKicadMultiLayer(),
+        default = MeatBagCSVSettingsAltium()
+    )
+    csvSettings = csvSettingsAvailable['default']
+    if args.format and args.format in csvSettingsAvailable:
+        csvSettings = csvSettingsAvailable[args.format]
+    else:
+        print("Using default CSV format")
     
     app = QtGui.QApplication(sys.argv)
-    ex = MeatBagWindow()
+    ex = MeatBagWindow(csvSettings, args)
     app.exec_()
 
 

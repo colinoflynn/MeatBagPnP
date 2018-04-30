@@ -33,6 +33,38 @@ The second uses a little CMOS camera. It works with all barcode types, BUT can b
 
 The easiest solution is to purchase two cheap scanners - they are still only like $15. Both run at once without issue.
 
+## Command Line
+In order to support other CSV file formats, and simply to avoid the requirement of using lots of GUI elements on every start-up, there are now several supported command line arguments.  These are documented by the online help, visible by launching with the --help flag.
+
+
+    usage: meatbag.py [-h] [--csv CSV] [--format FORMAT] [--width WIDTH] [--height HEIGHT] [--image IMAGE]
+    MeatBagPnP
+    optional arguments:
+      -h, --help       show this help message and exit
+      --csv CSV        CSV file to use
+      --format FORMAT  CSV file format (altium|kicad|eagle)
+      --width WIDTH    PCB width
+      --height HEIGHT  PCB height
+      --image IMAGE
+
+
+Where "csv" and "image" are paths to the files in question, and width/height are floats for the relevant PCB dimension.
+
+
+## Supported CAD
+
+The --format flag determines what type of CSV file the program expects. 
+
+### Altium
+Altium is the original, and default, system supported.
+
+### KiCad
+Specifying kicad for the --format will set things up for the default .pos file output by that program.  You can get specific info on how to get going on
+[this page](https://flyingcarsandstuff.com/2018/04/simplifying-assembly-open-source-manual-pick-place-assistance/) or having a gander at the contents of demo/KiCad in the source distribution.
+
+### Eagle
+Eagle works by using a ULP to spit out a CSV of the correct format. See demo/EagleCad.
+
 ## PnP File Format
 
 You can modify this as needed. Right now it assumes the following rough format (which is basically a default Altium output with some other stuff enabled):
@@ -47,6 +79,8 @@ You can modify this as needed. Right now it assumes the following rough format (
   NOTE2: You MUST have set your origin/reference as the bottom left of the PCB.
   
   NOTE3: Part number is the only used feature right now. The code could be modified to use value as well for example, which would allow you to use the "click feature" to identify all placements of a certain value even if you don't use unique PNs in your BOM.
+
+
   
 ## PCB Image
 
