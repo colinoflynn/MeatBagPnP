@@ -2,45 +2,68 @@
 import csv
 import sys
 import argparse
-from PySide import QtGui, QtCore, QtWebKit
-from urllib import urlopen
 
+# a little footwork to abstract away python2/PySide
+# vs python3/PySide2 changes:
+#  - try/except to attempt and make process transparent
+#  - some import Foo as Bar to mask some differences
+# Only tested, to date, with python3 as that's what I
+# gotz.
+try:
+    from PySide import QtGui, QtCore, QtWebKit
+    from PySide import QtGui as Widgets 
+    from QtWebKit import QWebView as WebView
+    from urllib import urlopen
+except Exception as py2Ex:
+    try:
+        from PySide2 import QtGui, QtCore, QtWidgets
+        from PySide2 import QtWidgets as Widgets
+        from PySide2.QtWebEngineWidgets import QWebEngineView as WebView
+        
+        
+        from urllib.request import urlopen
+    except Exception as py3Ex:
+        print("Python2(?) Exceptions: %s" % str(py2Ex))
+        print("Python3 Exceptions: %s" % str(py3Ex))
+        raise py3Ex
+    
+        
 from sgmllib import SGMLParser
 
 
-class PCBPainter(QtGui.QDialog):
+class PCBPainter(Widgets.QDialog):
     def __init__(self, parent):
         super(PCBPainter, self).__init__(parent)
 
-        self.imglabel = QtGui.QLabel()
+        self.imglabel = Widgets.QLabel()
 
-        vb = QtGui.QVBoxLayout()
+        vb = Widgets.QVBoxLayout()
         vb.addWidget(self.imglabel)
 
-        openpb = QtGui.QPushButton("Set PCB Image")
+        openpb = Widgets.QPushButton("Set PCB Image")
         openpb.clicked.connect(self.set_image)
 
         self.timerFocus = QtCore.QTimer()
         self.timerFocus.setSingleShot(True)
         self.timerFocus.timeout.connect(self.clearfocus)
 
-        self.pcbwidth = QtGui.QDoubleSpinBox()
+        self.pcbwidth = Widgets.QDoubleSpinBox()
         self.pcbwidth.setMinimum(0)
         self.pcbwidth.setMaximum(100000)
         self.pcbwidth.valueChanged.connect(self.clearfocusdelay)
-        self.pcbheight = QtGui.QDoubleSpinBox()
+        self.pcbheight = Widgets.QDoubleSpinBox()
         self.pcbheight.setMinimum(0)
         self.pcbheight.setMaximum(100000)
         self.pcbheight.valueChanged.connect(self.clearfocusdelay)
         self.marker_diameter = 5
 
-        buttongrid = QtGui.QHBoxLayout()
+        buttongrid = Widgets.QHBoxLayout()
         buttongrid.addWidget(openpb)
         buttongrid.addSpacing(5)
-        buttongrid.addWidget(QtGui.QLabel("PCB Width (units): "))
+        buttongrid.addWidget(Widgets.QLabel("PCB Width (units): "))
         buttongrid.addWidget(self.pcbwidth)
         buttongrid.addSpacing(5)
-        buttongrid.addWidget(QtGui.QLabel("PCB Height (units):"))
+        buttongrid.addWidget(Widgets.QLabel("PCB Height (units):"))
         buttongrid.addWidget(self.pcbheight)
         buttongrid.addStretch(5)
 
@@ -75,7 +98,7 @@ class PCBPainter(QtGui.QDialog):
             scale_x = float(self.base.width()) / float(boardwidth)
             scale_y = float(self.base.height()) / float(boardheight)
         except ZeroDivisionError:
-            QtGui.QMessageBox.warning("Division by Zero", "Division by zero - did you set board height & width in image?")
+            Widgets.QMessageBox.warning("Division by Zero", "Division by zero - did you set board height & width in image?")
             raise
 
         x = x * scale_x
@@ -129,7 +152,7 @@ class PCBPainter(QtGui.QDialog):
             self.redraw()
 
     def set_image(self):
-        filename, filter = QtGui.QFileDialog.getOpenFileName(parent=self, caption='Select PCB Image', dir='.',
+        filename, filter = Widgets.QFileDialog.getOpenFileName(parent=self, caption='Select PCB Image', dir='.',
                                                              filter='PCB Image (*.png)')
 
         self.image_selected(filename)
@@ -209,7 +232,7 @@ class KeyAction(object):
         return self.cb()
 
 
-class MeatBagWindow(QtGui.QMainWindow):
+class MeatBagWindow(Widgets.QMainWindow):
     
     def __init__(self, csvSettings, parsedArgs):
         super(MeatBagWindow, self).__init__()
@@ -228,7 +251,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.getSettings()
         self.show()
 
-        self.webView = QtWebKit.QWebView()
+        self.webView = WebView()
         self.webView.loadFinished.connect(self.lookupdone)
 
         self.last_keys = ""
@@ -258,25 +281,25 @@ class MeatBagWindow(QtGui.QMainWindow):
 
     def getSettings(self):
         """Configure settings. Eventually ask user, for now configure in source."""
-	pass
+        pass
 
         
     def initLayout(self):
-        mainLayout = QtGui.QVBoxLayout()
+        mainLayout = Widgets.QVBoxLayout()
 
         ###Main parts table
-        self.table = QtGui.QTableWidget()
+        self.table = Widgets.QTableWidget()
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.installEventFilter(self.efilter)
         self.table.cellClicked.connect(self.table_cellClicked)
 
         ###Build Configuration
-        gbBuildSetup = QtGui.QGroupBox()
+        gbBuildSetup = Widgets.QGroupBox()
         gbBuildSetup.setTitle("Build Settings")
-        buildLayout = QtGui.QGridLayout()
+        buildLayout = Widgets.QGridLayout()
 
         #Top/Bottom Selection
-        cbSide = QtGui.QComboBox()
+        cbSide = Widgets.QComboBox()
         cbSide.addItem("Top")
         cbSide.addItem("Bottom")
         cbSide.activated.connect(self.sideSelectionChanged)
@@ -287,31 +310,31 @@ class MeatBagWindow(QtGui.QMainWindow):
 
 
         ###Part Display
-        gbPart = QtGui.QGroupBox()
+        gbPart = Widgets.QGroupBox()
         gbPart.setTitle("Part Info")
 
-        self.topDes = QtGui.QLineEdit()
+        self.topDes = Widgets.QLineEdit()
         self.topDes.setReadOnly(True)
-        self.botDes = QtGui.QLineEdit()
+        self.botDes = Widgets.QLineEdit()
         self.botDes.setReadOnly(True)
 
-        partLayout = QtGui.QGridLayout()
+        partLayout = Widgets.QGridLayout()
 
-        label_cur = QtGui.QLabel("Current Placement:")
+        label_cur = Widgets.QLabel("Current Placement:")
         f = label_cur.font()
         f.setPointSize(12)
         label_cur.setFont(f)
         partLayout.addWidget(label_cur, 0, 0)
 
-        self.place = QtGui.QLineEdit()
+        self.place = Widgets.QLineEdit()
         f = self.place.font()
         f.setPointSize(12)
         self.place.setFont(f)
         self.place.setReadOnly(True)
         partLayout.addWidget(self.place, 0, 1)
 
-        partLayout.addWidget(QtGui.QLabel("Top-Side Designators:"), 2, 0)
-        partLayout.addWidget(QtGui.QLabel("Bot-Side Designators:"), 3, 0)
+        partLayout.addWidget(Widgets.QLabel("Top-Side Designators:"), 2, 0)
+        partLayout.addWidget(Widgets.QLabel("Bot-Side Designators:"), 3, 0)
         partLayout.addWidget(self.topDes, 2, 1)
         partLayout.addWidget(self.botDes, 3, 1)
 
@@ -319,22 +342,22 @@ class MeatBagWindow(QtGui.QMainWindow):
 
         ### Debug Stuff
 
-        gbDebug = QtGui.QGroupBox()
+        gbDebug = Widgets.QGroupBox()
         gbDebug.setTitle("Part Number Info")
 
-        self.scanLine = QtGui.QPlainTextEdit()
+        self.scanLine = Widgets.QPlainTextEdit()
         self.scanLine.setFixedHeight(40)
-        self.scanLine.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Minimum)
+        self.scanLine.setSizePolicy(Widgets.QSizePolicy.Minimum, Widgets.QSizePolicy.Minimum)
         self.scanLine.textChanged.connect(self.scanline_changed)
 
-        debugLayout = QtGui.QHBoxLayout()
-        debugLayout.addWidget(QtGui.QLabel("Scan Output (or paste P/N here):"))
+        debugLayout = Widgets.QHBoxLayout()
+        debugLayout.addWidget(Widgets.QLabel("Scan Output (or paste P/N here):"))
         debugLayout.addWidget(self.scanLine)
 
         gbDebug.setLayout(debugLayout)
 
         ### Rest of Stuff
-        window = QtGui.QWidget()
+        window = Widgets.QWidget()
         window.setLayout(mainLayout)
 
         self.pcbpainter = PCBPainter(window)
@@ -349,7 +372,7 @@ class MeatBagWindow(QtGui.QMainWindow):
         self.setCentralWidget(window)
 
     def initMenus(self):
-        self.openAct = QtGui.QAction("&Open...", self,
+        self.openAct = Widgets.QAction("&Open...", self,
                 shortcut=QtGui.QKeySequence.Open,
                 statusTip="Open an existing file", triggered=self.openFile)
 
@@ -391,7 +414,7 @@ class MeatBagWindow(QtGui.QMainWindow):
     def openFile(self):
         """Open new CSV PnP file"""
 
-        filename, filter = QtGui.QFileDialog.getOpenFileName(parent=self, caption='Select PnP file', dir='.', filter='CSV files (*.csv *.mnt)')
+        filename, filter = Widgets.QFileDialog.getOpenFileName(parent=self, caption='Select PnP file', dir='.', filter='CSV files (*.csv *.mnt)')
 
         if not filename:
             return
@@ -401,7 +424,7 @@ class MeatBagWindow(QtGui.QMainWindow):
     def parseCSVFile(self, filename):
         ppdata = []
         
-        with open(filename, "rb") as csvfile:
+        with open(filename, "r") as csvfile:
             ppfile = csv.reader(csvfile, delimiter=',', quotechar='"')
             for row in ppfile:
                 if len(row) < 4:
@@ -417,11 +440,11 @@ class MeatBagWindow(QtGui.QMainWindow):
         for r in range(0, numRows):
             for c in range(0, numCols - 1):
                 try:
-                    self.table.setItem(r, c, QtGui.QTableWidgetItem(ppdata[r][c]))
+                    self.table.setItem(r, c, Widgets.QTableWidgetItem(ppdata[r][c]))
                 except IndexError:
-                    self.table.setItem(r, c, QtGui.QTableWidgetItem("???"))
+                    self.table.setItem(r, c, Widgets.QTableWidgetItem("???"))
 
-            checkitem = QtGui.QTableWidgetItem()
+            checkitem = Widgets.QTableWidgetItem()
             checkitem.setCheckState(QtCore.Qt.Unchecked)
             self.table.setItem(r, numCols-1, checkitem)
 
@@ -743,7 +766,7 @@ def main():
     else:
         print("Using default CSV format")
     
-    app = QtGui.QApplication(sys.argv)
+    app = Widgets.QApplication(sys.argv)
     ex = MeatBagWindow(csvSettings, args)
     app.exec_()
 
